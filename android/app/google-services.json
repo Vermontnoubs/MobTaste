@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "57070185506",
+    "project_id": "moptaste-79728",
+    "storage_bucket": "moptaste-79728.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:57070185506:android:f4b550e0c5cf6fa8e56e7b",
+        "android_client_info": {
+          "package_name": "com.example.moptaste"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCL5bDP63fSYMz2lqq5mT63luKnMQaq5Fo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
