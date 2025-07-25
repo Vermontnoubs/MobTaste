@@ -1,10 +1,13 @@
 // lib/screens/restaurant/restaurant_dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:moptaste/models/restaurant.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/theme.dart';
-import '../../models/order.dart'; // Import Order model
-import '../../models/meal.dart'; // Import Meal model
+import '../../models/order.dart';
+import '../../models/meal.dart';
+import '../../models/user.dart';
+import '../../models/restaurant.dart';
+import '../../controllers/auth_service.dart';
+import '../../controllers/restaurant_service.dart';
+import '../../controllers/order_service.dart';
 
 class RestaurantDashboard extends StatefulWidget {
   @override
@@ -12,10 +15,15 @@ class RestaurantDashboard extends StatefulWidget {
 }
 
 class _RestaurantDashboardState extends State<RestaurantDashboard> with SingleTickerProviderStateMixin {
-  String userName = '';
-  String restaurantId = 'rest1'; // Dummy restaurant ID for this dashboard (e.g., The Spicy Spoon)
+  final _authService = AuthService();
+  final _restaurantService = RestaurantService();
+  final _orderService = OrderService();
+  
+  AppUser? currentUser;
+  Restaurant? restaurantData;
   List<Order> _incomingOrders = [];
-  List<Meal> _restaurantMenu = []; // This will hold the menu items for management
+  List<Meal> _restaurantMenu = [];
+  bool _isLoading = true;
 
   late TabController _tabController;
 
@@ -24,7 +32,6 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> with SingleTi
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadUserData();
-    _fetchRestaurantData();
   }
 
   @override
@@ -34,59 +41,109 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> with SingleTi
   }
 
   _loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userName = prefs.getString('userName') ?? 'Restaurant Owner';
-      // In a real app, restaurantId would come from user login data
-      // For now, we'll assume this dashboard is for 'The Spicy Spoon' (rest1)
-    });
+    try {
+      final user = await _authService.getCurrentAppUser();
+      if (user != null) {
+        setState(() {
+          currentUser = user;
+        });
+        await _fetchRestaurantData();
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
-  _fetchRestaurantData() {
-    setState(() {
-      // 1. Simulate fetching incoming orders for this restaurant
-      // Filter orders by restaurant name which corresponds to our dummy ID 'rest1'
-      _incomingOrders = Order.dummyOrders.where((order) =>
-      order.pickupLocation == 'The Spicy Spoon' && // Assuming 'The Spicy Spoon' is rest1
+  _fetchRestaurantData() async {
+    if (currentUser == null) return;
+    
+    try {
+      // Get restaurant data
+      final restaurant = await _restaurantService.getRestaurantById(currentUser!.uid);
+      
+      // Get restaurant orders
+      final orders = await _orderService.getRestaurantOrders(currentUser!.uid);
+      
+      // Get restaurant menu
+      final menu = await _restaurantService.getRestaurantMenu(currentUser!.uid);
+      
+      setState(() {
+        restaurantData = restaurant;
+        _incomingOrders = orders.where((order) =>
+          order.status == OrderStatus.pending || 
+          order.status == OrderStatus.preparing || 
+          order.status == OrderStatus.readyForPickup
+        ).toList();
+        _restaurantMenu = menu;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching restaurant data: $e');
+      // Fallback to dummy data
+      setState(() {
+        _incomingOrders = Order.dummyOrders.where((order) =>
+          order.pickupLocation == currentUser?.restaurantName && 
           (order.status == OrderStatus.pending || order.status == OrderStatus.preparing || order.status == OrderStatus.readyForPickup)
-      ).toList();
+        ).toList();
 
-      // 2. Find the specific restaurant object from dummy data
-      final Restaurant? currentRestaurant = Restaurant.dummyRestaurants.firstWhere(
-            (rest) => rest.id == restaurantId,
-        orElse: () => Restaurant(
-            id: 'temp', name: 'Unknown Restaurant', imageUrl: '', cuisine: '', rating: 0, address: '', description: '', menu: []
+        // Use dummy restaurant data as fallback
+        final Restaurant? currentRestaurant = Restaurant.dummyRestaurants.isNotEmpty 
+          ? Restaurant.dummyRestaurants.first
+          : null;
+
+        restaurantData = currentRestaurant;
+        _restaurantMenu = List.from(currentRestaurant?.menu ?? []);
+
+        // Add dummy recipes for management purposes, ensuring no duplicates
+        for (var recipe in Meal.dummyRecipes) {
+          if (!_restaurantMenu.any((meal) => meal.id == recipe.id)) {
+            _restaurantMenu.add(recipe);
+          }
+        }
+        _isLoading = false;
+      });
+  }
+
+  _updateOrderStatus(Order order, OrderStatus newStatus) async {
+    try {
+      final success = await _orderService.updateOrderStatus(
+        orderId: order.id,
+        status: newStatus,
+      );
+      
+      if (success) {
+        setState(() {
+          order.status = newStatus;
+          if (newStatus == OrderStatus.readyForPickup || newStatus == OrderStatus.delivered) {
+            _incomingOrders.removeWhere((o) => o.id == order.id);
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Order ${order.id} status updated to ${newStatus.toString().split('.').last}!'),
+            backgroundColor: AppTheme.primaryOrange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update order status. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating order status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred while updating the order.'),
+          backgroundColor: Colors.red,
         ),
       );
-
-      // 3. Initialize _restaurantMenu with the actual menu items of the found restaurant.
-      // Use List.from to create a mutable copy from the constant menu list.
-      _restaurantMenu = List.from(currentRestaurant?.menu ?? []);
-
-      // 4. Add dummy recipes for management purposes, ensuring no duplicates
-      for (var recipe in Meal.dummyRecipes) {
-        // Only add if an item with the same ID isn't already in the menu
-        if (!_restaurantMenu.any((meal) => meal.id == recipe.id)) {
-          _restaurantMenu.add(recipe);
-        }
-      }
-    });
-  }
-
-  _updateOrderStatus(Order order, OrderStatus newStatus) {
-    setState(() {
-      order.status = newStatus;
-      if (newStatus == OrderStatus.readyForPickup || newStatus == OrderStatus.delivered) {
-        // In a real app, this would typically move to an 'order history' list
-        _incomingOrders.removeWhere((o) => o.id == order.id);
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Order ${order.id} status updated to ${newStatus.toString().split('.').last}!'),
-        backgroundColor: AppTheme.primaryOrange,
-      ),
-    );
+    }
   }
 
   _addMenuItem(Meal newItem) {
@@ -132,8 +189,7 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> with SingleTi
           ),
           ElevatedButton(
             onPressed: () async {
-              SharedPreferences prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
+              await _authService.signOut();
               Navigator.pushReplacementNamed(context, '/login');
             },
             child: Text('Yes'),
@@ -145,9 +201,20 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Loading Restaurant Dashboard...'),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Restaurant Dashboard - ${userName}'),
+        title: Text('Restaurant Dashboard - ${currentUser?.restaurantName ?? currentUser?.name ?? 'Restaurant'}'),
         actions: [
           IconButton(
             icon: Icon(Icons.logout),

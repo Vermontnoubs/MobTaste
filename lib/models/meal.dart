@@ -20,6 +20,31 @@ class Meal {
     this.ingredients = const [], // Default to empty list
   });
 
+  // Convert to Map for Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'description': description,
+      'price': price,
+      'imageUrl': imageUrl,
+      'isMeal': isMeal,
+      'ingredients': ingredients,
+    };
+  }
+
+  // Create from Firestore document
+  factory Meal.fromMap(Map<String, dynamic> map, String id) {
+    return Meal(
+      id: id,
+      name: map['name'] ?? '',
+      description: map['description'] ?? '',
+      price: (map['price'] ?? 0.0).toDouble(),
+      imageUrl: map['imageUrl'] ?? '',
+      isMeal: map['isMeal'] ?? true,
+      ingredients: List<String>.from(map['ingredients'] ?? []),
+    );
+  }
+
   // Dummy static list of recipes for the recipe screen and ingredient ordering
   static List<Meal> dummyRecipes = [
     Meal(

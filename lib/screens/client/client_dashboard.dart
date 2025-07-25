@@ -1,10 +1,12 @@
 // lib/screens/client/client_dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/theme.dart';
-import '../../models/meal.dart'; // Import the Meal model
-import '../../models/restaurant.dart'; // Import the Restaurant model
-import 'restaurant_menu_screen.dart'; // Import the RestaurantMenuScreen
+import '../../models/meal.dart';
+import '../../models/restaurant.dart';
+import '../../models/user.dart';
+import '../../controllers/auth_service.dart';
+import '../../controllers/restaurant_service.dart';
+import 'restaurant_menu_screen.dart';
 
 class ClientDashboard extends StatefulWidget {
   @override
@@ -12,19 +14,24 @@ class ClientDashboard extends StatefulWidget {
 }
 
 class _ClientDashboardState extends State<ClientDashboard> with SingleTickerProviderStateMixin {
-  String userName = '';
+  final _authService = AuthService();
+  final _restaurantService = RestaurantService();
+  
+  AppUser? currentUser;
   late TabController _tabController;
   final TextEditingController _restaurantSearchController = TextEditingController();
   final TextEditingController _recipeSearchController = TextEditingController();
+  List<Restaurant> _allRestaurants = [];
   List<Restaurant> _filteredRestaurants = [];
   List<Meal> _filteredRecipes = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadUserData();
-    _filteredRestaurants = Restaurant.dummyRestaurants; // Initialize with all restaurants
+    _loadRestaurants();
     _filteredRecipes = Meal.dummyRecipes; // Initialize with all recipes
 
     _restaurantSearchController.addListener(_filterRestaurants);
@@ -40,16 +47,38 @@ class _ClientDashboardState extends State<ClientDashboard> with SingleTickerProv
   }
 
   _loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userName = prefs.getString('userName') ?? 'Client';
-    });
+    try {
+      final user = await _authService.getCurrentAppUser();
+      setState(() {
+        currentUser = user;
+      });
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
+  }
+
+  _loadRestaurants() async {
+    try {
+      final restaurants = await _restaurantService.getAllRestaurants();
+      setState(() {
+        _allRestaurants = restaurants;
+        _filteredRestaurants = restaurants;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading restaurants: $e');
+      setState(() {
+        _allRestaurants = Restaurant.dummyRestaurants; // Fallback to dummy data
+        _filteredRestaurants = Restaurant.dummyRestaurants;
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterRestaurants() {
     final query = _restaurantSearchController.text.toLowerCase();
     setState(() {
-      _filteredRestaurants = Restaurant.dummyRestaurants.where((restaurant) {
+      _filteredRestaurants = _allRestaurants.where((restaurant) {
         return restaurant.name.toLowerCase().contains(query) ||
             restaurant.cuisine.toLowerCase().contains(query) ||
             restaurant.address.toLowerCase().contains(query);
@@ -81,8 +110,7 @@ class _ClientDashboardState extends State<ClientDashboard> with SingleTickerProv
           ),
           ElevatedButton(
             onPressed: () async {
-              SharedPreferences prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
+              await _authService.signOut();
               Navigator.pushReplacementNamed(context, '/login');
             },
             child: Text('Yes'),
@@ -94,9 +122,20 @@ class _ClientDashboardState extends State<ClientDashboard> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Loading...'),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Welcome, $userName'),
+        title: Text('Welcome, ${currentUser?.name ?? 'Client'}'),
         actions: [
           IconButton(
             icon: Icon(Icons.logout),

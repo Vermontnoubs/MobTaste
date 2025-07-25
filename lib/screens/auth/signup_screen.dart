@@ -1,7 +1,8 @@
 // lib/screens/auth/signup_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/theme.dart';
+import '../../controllers/auth_service.dart';
+import '../../models/user.dart';
 
 class SignupScreen extends StatefulWidget {
   @override
@@ -14,32 +15,185 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
-  String _selectedRole = 'client'; // Default role
+  final _restaurantNameController = TextEditingController();
+  final _cuisineController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _licenseNumberController = TextEditingController();
+  final _vehicleTypeController = TextEditingController();
+  final _authService = AuthService();
+  
+  String _selectedRole = 'client';
   bool _isLoading = false;
 
   _signup() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // Simulate API call
-      await Future.delayed(Duration(seconds: 2));
+      try {
+        UserRole role;
+        switch (_selectedRole) {
+          case 'restaurant':
+            role = UserRole.restaurant;
+            break;
+          case 'delivery_agent':
+            role = UserRole.deliveryAgent;
+            break;
+          default:
+            role = UserRole.client;
+        }
 
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('userEmail', _emailController.text);
-      await prefs.setString('userName', _nameController.text);
-      await prefs.setString('userRole', _selectedRole);
-      await prefs.setString('userPhone', _phoneController.text);
+        final result = await _authService.signUpWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          role: role,
+          restaurantName: role == UserRole.restaurant ? _restaurantNameController.text.trim() : null,
+          cuisine: role == UserRole.restaurant ? _cuisineController.text.trim() : null,
+          address: (role == UserRole.restaurant || role == UserRole.deliveryAgent) ? _addressController.text.trim() : null,
+          licenseNumber: role == UserRole.deliveryAgent ? _licenseNumberController.text.trim() : null,
+          vehicleType: role == UserRole.deliveryAgent ? _vehicleTypeController.text.trim() : null,
+        );
 
-      setState(() => _isLoading = false);
+        setState(() => _isLoading = false);
 
-      if (_selectedRole == 'delivery_agent') {
-        Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
-      } else if (_selectedRole == 'restaurant') {
-        Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/client-dashboard');
+        if (result.success && result.user != null) {
+          // Navigate based on user role
+          switch (result.user!.role) {
+            case UserRole.client:
+              Navigator.pushReplacementNamed(context, '/client-dashboard');
+              break;
+            case UserRole.restaurant:
+              Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
+              break;
+            case UserRole.deliveryAgent:
+              Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
+              break;
+          }
+        } else {
+          _showErrorDialog(result.message);
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        _showErrorDialog('An unexpected error occurred. Please try again.');
       }
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Registration Failed'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleSpecificFields() {
+    switch (_selectedRole) {
+      case 'restaurant':
+        return Column(
+          children: [
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _restaurantNameController,
+              decoration: InputDecoration(
+                labelText: 'Restaurant Name',
+                prefixIcon: Icon(Icons.restaurant, color: AppTheme.primaryOrange),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your restaurant name';
+                }
+                return null;
+              },
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _cuisineController,
+              decoration: InputDecoration(
+                labelText: 'Cuisine Type',
+                prefixIcon: Icon(Icons.local_dining, color: AppTheme.primaryOrange),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your cuisine type';
+                }
+                return null;
+              },
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _addressController,
+              decoration: InputDecoration(
+                labelText: 'Restaurant Address',
+                prefixIcon: Icon(Icons.location_on, color: AppTheme.primaryOrange),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your restaurant address';
+                }
+                return null;
+              },
+            ),
+          ],
+        );
+      case 'delivery_agent':
+        return Column(
+          children: [
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _licenseNumberController,
+              decoration: InputDecoration(
+                labelText: 'License Number',
+                prefixIcon: Icon(Icons.credit_card, color: AppTheme.primaryOrange),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your license number';
+                }
+                return null;
+              },
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _vehicleTypeController,
+              decoration: InputDecoration(
+                labelText: 'Vehicle Type',
+                prefixIcon: Icon(Icons.motorcycle, color: AppTheme.primaryOrange),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your vehicle type';
+                }
+                return null;
+              },
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _addressController,
+              decoration: InputDecoration(
+                labelText: 'Address',
+                prefixIcon: Icon(Icons.location_on, color: AppTheme.primaryOrange),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your address';
+                }
+                return null;
+              },
+            ),
+          ],
+        );
+      default:
+        return SizedBox.shrink();
     }
   }
 
@@ -176,6 +330,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ],
                       ),
                     ),
+                    _buildRoleSpecificFields(),
                     SizedBox(height: 30),
                     ElevatedButton(
                       onPressed: _isLoading ? null : _signup,

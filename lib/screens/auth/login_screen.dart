@@ -1,7 +1,8 @@
 // lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/theme.dart';
+import '../../controllers/auth_service.dart';
+import '../../models/user.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -12,42 +13,115 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
   bool _isLoading = false;
 
   _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // Simulate API call
-      await Future.delayed(Duration(seconds: 2));
+      try {
+        final result = await _authService.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('userEmail', _emailController.text);
+        setState(() => _isLoading = false);
 
-      // For demo purposes, determine role based on email or pre-registered data
-      // In a real app, this would come from your backend authentication
-      String role = 'client'; // Default role
-
-      if (_emailController.text.contains('delivery')) {
-        role = 'delivery_agent';
-      } else if (_emailController.text.contains('restaurant')) {
-        role = 'restaurant';
-      }
-
-      await prefs.setString('userRole', role);
-      await prefs.setString('userName', 'Test User ($role)'); // Set a dummy name for testing
-
-      setState(() => _isLoading = false);
-
-      if (role == 'delivery_agent') {
-        Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
-      } else if (role == 'restaurant') {
-        Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/client-dashboard');
+        if (result.success && result.user != null) {
+          // Navigate based on user role
+          switch (result.user!.role) {
+            case UserRole.client:
+              Navigator.pushReplacementNamed(context, '/client-dashboard');
+              break;
+            case UserRole.restaurant:
+              Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
+              break;
+            case UserRole.deliveryAgent:
+              Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
+              break;
+          }
+        } else {
+          _showErrorDialog(result.message);
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        _showErrorDialog('An unexpected error occurred. Please try again.');
       }
     }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Login Failed'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showForgotPasswordDialog() {
+    final emailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Enter your email address to receive a password reset link.'),
+            SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (emailController.text.isNotEmpty) {
+                final result = await _authService.resetPassword(emailController.text.trim());
+                Navigator.pop(context);
+                _showInfoDialog(result.message);
+              }
+            },
+            child: Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Information'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -118,12 +192,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? CircularProgressIndicator(color: AppTheme.neutralWhite)
                           : Text('Login'),
                     ),
-                    SizedBox(height: 20),
+                    SizedBox(height: 10),
+                    TextButton(
+                      onPressed: _showForgotPasswordDialog,
+                      child: Text(
+                        'Forgot Password?',
+                        style: TextStyle(color: AppTheme.primaryOrange),
+                      ),
+                    ),
+                    SizedBox(height: 10),
                     TextButton(
                       onPressed: () => Navigator.pushNamed(context, '/signup'),
                       child: Text(
                         'Don\'t have an account? Sign up',
-                        style: TextStyle(color: AppTheme.accentRed), // Use accent red for links
+                        style: TextStyle(color: AppTheme.accentRed),
                       ),
                     ),
                   ],

@@ -1,7 +1,9 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/theme.dart'; // Import your custom theme
+import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/theme.dart';
+import '../controllers/auth_service.dart';
+import '../models/user.dart';
 
 class SplashScreen extends StatefulWidget {
   @override
@@ -9,6 +11,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final _authService = AuthService();
+
   @override
   void initState() {
     super.initState();
@@ -17,23 +21,40 @@ class _SplashScreenState extends State<SplashScreen> {
 
   _checkAuthStatus() async {
     // Simulate a loading time for the splash screen
-    await Future.delayed(Duration(seconds: 3));
+    await Future.delayed(Duration(seconds: 2));
 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    String userRole = prefs.getString('userRole') ?? '';
-
-    if (isLoggedIn) {
-      // Navigate based on the user's role
-      if (userRole == 'delivery_agent') {
-        Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
-      } else if (userRole == 'restaurant') {
-        Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
-      } else { // Default to client if role is not specified or is 'client'
-        Navigator.pushReplacementNamed(context, '/client-dashboard');
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      
+      if (currentUser != null) {
+        // User is signed in, get their profile data
+        final appUser = await _authService.getCurrentAppUser();
+        
+        if (appUser != null) {
+          // Navigate based on user role
+          switch (appUser.role) {
+            case UserRole.client:
+              Navigator.pushReplacementNamed(context, '/client-dashboard');
+              break;
+            case UserRole.restaurant:
+              Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
+              break;
+            case UserRole.deliveryAgent:
+              Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
+              break;
+          }
+        } else {
+          // User exists but no profile data, sign out and go to login
+          await _authService.signOut();
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      } else {
+        // No user signed in, go to login
+        Navigator.pushReplacementNamed(context, '/login');
       }
-    } else {
-      // If not logged in, go to the login screen
+    } catch (e) {
+      // Error occurred, go to login
+      print('Error checking auth status: $e');
       Navigator.pushReplacementNamed(context, '/login');
     }
   }
