@@ -73,7 +73,7 @@ class AppUser {
         (e) => e.toString().split('.').last == map['role'],
         orElse: () => UserRole.client,
       ),
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       profileImageUrl: map['profileImageUrl'],
       isActive: map['isActive'] ?? true,
       restaurantName: map['restaurantName'],

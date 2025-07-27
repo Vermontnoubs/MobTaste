@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import 'restaurant_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -11,6 +12,7 @@ class AuthService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final RestaurantService _restaurantService = RestaurantService();
 
   // Current user stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -79,6 +81,21 @@ class AuthService {
       );
 
       await _firestore.collection('users').doc(user.uid).set(appUser.toMap());
+
+      // If restaurant user, create restaurant profile
+      if (role == UserRole.restaurant && restaurantName != null && cuisine != null && address != null) {
+        final restaurantCreated = await _restaurantService.createRestaurantProfile(
+          userId: user.uid,
+          name: restaurantName,
+          cuisine: cuisine,
+          address: address,
+          description: 'Welcome to $restaurantName! We serve delicious $cuisine cuisine.',
+        );
+        
+        if (!restaurantCreated) {
+          print('Warning: Failed to create restaurant profile for user ${user.uid}');
+        }
+      }
 
       // Save user data locally
       await _saveUserDataLocally(appUser);
