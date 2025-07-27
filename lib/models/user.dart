@@ -1,5 +1,5 @@
 // lib/models/user.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 enum UserRole {
   client,
@@ -42,7 +42,7 @@ class AppUser {
     this.isAvailable,
   });
 
-  // Convert to Map for Firestore
+  // Convert to Map for local storage
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
@@ -50,7 +50,7 @@ class AppUser {
       'email': email,
       'phone': phone,
       'role': role.toString().split('.').last,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.millisecondsSinceEpoch,
       'profileImageUrl': profileImageUrl,
       'isActive': isActive,
       'restaurantName': restaurantName,
@@ -62,7 +62,7 @@ class AppUser {
     };
   }
 
-  // Create from Firestore document
+  // Create from Map (local storage)
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
       uid: map['uid'] ?? '',
@@ -73,7 +73,7 @@ class AppUser {
         (e) => e.toString().split('.').last == map['role'],
         orElse: () => UserRole.client,
       ),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       profileImageUrl: map['profileImageUrl'],
       isActive: map['isActive'] ?? true,
       restaurantName: map['restaurantName'],
@@ -85,10 +85,11 @@ class AppUser {
     );
   }
 
-  // Create from Firestore DocumentSnapshot
-  factory AppUser.fromSnapshot(DocumentSnapshot snapshot) {
-    return AppUser.fromMap(snapshot.data() as Map<String, dynamic>);
-  }
+  // Convert to JSON string for storage
+  String toJson() => json.encode(toMap());
+
+  // Create from JSON string
+  factory AppUser.fromJson(String source) => AppUser.fromMap(json.decode(source));
 
   // Copy with method for updates
   AppUser copyWith({
@@ -122,4 +123,13 @@ class AppUser {
       isAvailable: isAvailable ?? this.isAvailable,
     );
   }
+}
+
+// Auth result class for authentication operations
+class AuthResult {
+  final bool success;
+  final String? error;
+  final AppUser? user;
+
+  AuthResult({required this.success, this.error, this.user});
 }

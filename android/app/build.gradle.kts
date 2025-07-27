@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    id("com.google.gms.google-services") // ✅ Firebase plugin
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -21,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.moptaste" // ✅ Make sure this matches your Firebase package name
+        applicationId = "com.example.moptaste"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -37,10 +36,4 @@ android {
 
 flutter {
     source = "../.."
-}
-
-dependencies {
-    // ✅ Add Firebase SDK here
-    implementation("com.google.firebase:firebase-analytics")
-    // You can add more Firebase services here (Firestore, Auth, etc.)
 }
