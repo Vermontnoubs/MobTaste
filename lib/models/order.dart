@@ -1,20 +1,21 @@
 // lib/models/order.dart
-import 'package:flutter/material.dart'; // For IconData, if used directly in model for status icons
+import 'dart:convert';
 import 'package:intl/intl.dart'; // For date formatting
 
 enum OrderStatus {
-  pending,      // Order placed, waiting for restaurant/agent
-  preparing,    // Restaurant is preparing the meal
-  readyForPickup, // Meal/ingredients ready for agent pickup
-  onTheWay,     // Agent has picked up and is delivering
-  delivered,    // Order successfully delivered
-  cancelled,    // Order cancelled
+  pending,
+  confirmed,
+  preparing,
+  readyForPickup,
+  inProgress,
+  delivered,
+  cancelled,
 }
 
 class OrderItem {
   final String name;
   final int quantity;
-  final double unitPrice; // Price per item for meals or estimate for ingredient bundles
+  final double unitPrice;
 
   OrderItem({
     required this.name,
@@ -23,6 +24,24 @@ class OrderItem {
   });
 
   double get totalPrice => quantity * unitPrice;
+
+  // Convert to Map for storage
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'quantity': quantity,
+      'unitPrice': unitPrice,
+    };
+  }
+
+  // Create from Map
+  factory OrderItem.fromMap(Map<String, dynamic> map) {
+    return OrderItem(
+      name: map['name'] ?? '',
+      quantity: map['quantity'] ?? 0,
+      unitPrice: (map['unitPrice'] ?? 0.0).toDouble(),
+    );
+  }
 }
 
 class Order {
@@ -32,12 +51,17 @@ class Order {
   final String clientAddress;
   final List<OrderItem> items;
   final DateTime orderDate;
-  OrderStatus status;
-  String? deliveryAgentId; // Null if not yet assigned
-  String? deliveryAgentName; // Null if not yet assigned
-  final double deliveryFee; // Can be fixed or vary
-  final String pickupLocation; // Restaurant name or 'Local Market' for ingredients
-  final String orderType; // 'meal' or 'ingredients'
+  final OrderStatus status;
+  final String? deliveryAgentId;
+  final String? deliveryAgentName;
+  final double deliveryFee;
+  final String pickupLocation;
+  final String orderType;
+  final String? restaurantId;
+  final double totalAmount;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deliveredAt;
 
   Order({
     required this.id,
@@ -52,77 +76,103 @@ class Order {
     required this.deliveryFee,
     required this.pickupLocation,
     required this.orderType,
+    this.restaurantId,
+    required this.totalAmount,
+    required this.createdAt,
+    this.updatedAt,
+    this.deliveredAt,
   });
-
-  double get totalOrderPrice {
-    double itemTotal = items.fold(0.0, (sum, item) => sum + item.totalPrice);
-    return itemTotal + deliveryFee;
-  }
 
   // Helper to get formatted date
   String get formattedOrderDate => DateFormat('MMM d, yyyy HH:mm').format(orderDate);
 
-  // Static dummy data for demonstration purposes
-  static List<Order> dummyOrders = [
-    Order(
-      id: 'ord1',
-      clientId: 'clientA',
-      clientName: 'Alice Johnson',
-      clientAddress: '123 Main St, Buea',
-      items: [
-        OrderItem(name: 'Chicken Biryani', quantity: 2, unitPrice: 5000),
-      ],
-      orderDate: DateTime.now().subtract(Duration(minutes: 45)),
-      status: OrderStatus.readyForPickup,
-      deliveryFee: 500,
-      pickupLocation: 'The Spicy Spoon',
-      orderType: 'meal',
-    ),
-    Order(
-      id: 'ord2',
-      clientId: 'clientB',
-      clientName: 'Bob Williams',
-      clientAddress: '456 Oak Ave, Molyko',
-      items: [
-        OrderItem(name: 'All-purpose flour', quantity: 1, unitPrice: 1500),
-        OrderItem(name: 'Yeast', quantity: 1, unitPrice: 500),
-      ],
-      orderDate: DateTime.now().subtract(Duration(minutes: 60)),
-      status: OrderStatus.pending,
-      deliveryFee: 600,
-      pickupLocation: 'Local Market',
-      orderType: 'ingredients',
-    ),
-    Order(
-      id: 'ord3',
-      clientId: 'clientC',
-      clientName: 'Charlie Brown',
-      clientAddress: '789 Pine Ln, Great Soppo',
-      items: [
-        OrderItem(name: 'Margherita Pizza', quantity: 1, unitPrice: 6000),
-        OrderItem(name: 'Coca-Cola (Large)', quantity: 1, unitPrice: 1000),
-      ],
-      orderDate: DateTime.now().subtract(Duration(minutes: 30)),
-      status: OrderStatus.pending,
-      deliveryFee: 550,
-      pickupLocation: 'Pizzeria Bella',
-      orderType: 'meal',
-    ),
-    Order(
-      id: 'ord4',
-      clientId: 'clientD',
-      clientName: 'Diana Prince',
-      clientAddress: '101 Wonder St, Mile 17',
-      items: [
-        OrderItem(name: 'Ndolé & Plantains', quantity: 1, unitPrice: 4000),
-      ],
-      orderDate: DateTime.now().subtract(Duration(days: 1, minutes: 120)),
-      status: OrderStatus.delivered,
-      deliveryAgentId: 'agent1',
-      deliveryAgentName: 'David Eposi',
-      deliveryFee: 500,
-      pickupLocation: 'Mama Africa Delights',
-      orderType: 'meal',
-    ),
-  ];
+  // Convert to Map for local storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'clientId': clientId,
+      'clientName': clientName,
+      'clientAddress': clientAddress,
+      'items': items.map((item) => item.toMap()).toList(),
+      'orderDate': orderDate.millisecondsSinceEpoch,
+      'status': status.toString().split('.').last,
+      'deliveryAgentId': deliveryAgentId,
+      'deliveryAgentName': deliveryAgentName,
+      'deliveryFee': deliveryFee,
+      'pickupLocation': pickupLocation,
+      'orderType': orderType,
+      'restaurantId': restaurantId,
+      'totalAmount': totalAmount,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch,
+      'deliveredAt': deliveredAt?.millisecondsSinceEpoch,
+    };
+  }
+
+  // Create from Map (local storage)
+  factory Order.fromMap(Map<String, dynamic> map) {
+    return Order(
+      id: map['id'] ?? '',
+      clientId: map['clientId'] ?? '',
+      clientName: map['clientName'] ?? '',
+      clientAddress: map['clientAddress'] ?? '',
+      items: (map['items'] as List<dynamic>?)
+          ?.map((item) => OrderItem.fromMap(item))
+          .toList() ?? [],
+      orderDate: DateTime.fromMillisecondsSinceEpoch(map['orderDate'] ?? 0),
+      status: OrderStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == map['status'],
+        orElse: () => OrderStatus.pending,
+      ),
+      deliveryAgentId: map['deliveryAgentId'],
+      deliveryAgentName: map['deliveryAgentName'],
+      deliveryFee: (map['deliveryFee'] ?? 0.0).toDouble(),
+      pickupLocation: map['pickupLocation'] ?? '',
+      orderType: map['orderType'] ?? 'meal',
+      restaurantId: map['restaurantId'],
+      totalAmount: (map['totalAmount'] ?? 0.0).toDouble(),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
+      updatedAt: map['updatedAt'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'])
+          : null,
+      deliveredAt: map['deliveredAt'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['deliveredAt'])
+          : null,
+    );
+  }
+
+  // Convert to JSON string for storage
+  String toJson() => json.encode(toMap());
+
+  // Create from JSON string
+  factory Order.fromJson(String source) => Order.fromMap(json.decode(source));
+
+  // Copy with method for updates
+  Order copyWith({
+    OrderStatus? status,
+    String? deliveryAgentId,
+    String? deliveryAgentName,
+    DateTime? updatedAt,
+    DateTime? deliveredAt,
+  }) {
+    return Order(
+      id: id,
+      clientId: clientId,
+      clientName: clientName,
+      clientAddress: clientAddress,
+      items: items,
+      orderDate: orderDate,
+      status: status ?? this.status,
+      deliveryAgentId: deliveryAgentId ?? this.deliveryAgentId,
+      deliveryAgentName: deliveryAgentName ?? this.deliveryAgentName,
+      deliveryFee: deliveryFee,
+      pickupLocation: pickupLocation,
+      orderType: orderType,
+      restaurantId: restaurantId,
+      totalAmount: totalAmount,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
+    );
+  }
 }

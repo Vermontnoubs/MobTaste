@@ -1,6 +1,5 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/theme.dart';
 import '../controllers/auth_service.dart';
 import '../models/user.dart';
@@ -24,29 +23,21 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future.delayed(Duration(seconds: 2));
 
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
+      await _authService.initialize();
+      final appUser = await _authService.getCurrentAppUser();
       
-      if (currentUser != null) {
-        // User is signed in, get their profile data
-        final appUser = await _authService.getCurrentAppUser();
-        
-        if (appUser != null) {
-          // Navigate based on user role
-          switch (appUser.role) {
-            case UserRole.client:
-              Navigator.pushReplacementNamed(context, '/client-dashboard');
-              break;
-            case UserRole.restaurant:
-              Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
-              break;
-            case UserRole.deliveryAgent:
-              Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
-              break;
-          }
-        } else {
-          // User exists but no profile data, sign out and go to login
-          await _authService.signOut();
-          Navigator.pushReplacementNamed(context, '/login');
+      if (appUser != null) {
+        // Navigate based on user role
+        switch (appUser.role) {
+          case UserRole.client:
+            Navigator.pushReplacementNamed(context, '/client-dashboard');
+            break;
+          case UserRole.restaurant:
+            Navigator.pushReplacementNamed(context, '/restaurant-dashboard');
+            break;
+          case UserRole.deliveryAgent:
+            Navigator.pushReplacementNamed(context, '/delivery-agent-dashboard');
+            break;
         }
       } else {
         // No user signed in, go to login

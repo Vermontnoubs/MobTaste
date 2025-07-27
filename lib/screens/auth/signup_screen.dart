@@ -43,7 +43,7 @@ class _SignupScreenState extends State<SignupScreen> {
         }
 
         // Use the robust registration method that handles PigeonUserDetails errors
-        final result = await _authService.signUpRobust(
+        final result = await _authService.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text,
           name: _nameController.text.trim(),
@@ -72,7 +72,7 @@ class _SignupScreenState extends State<SignupScreen> {
               break;
           }
         } else {
-          _showErrorDialog(result.message);
+          _showErrorDialog(result.error ?? 'Signup failed');
         }
       } catch (e) {
         setState(() => _isLoading = false);

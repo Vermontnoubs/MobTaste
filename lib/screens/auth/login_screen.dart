@@ -21,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
 
       try {
-        final result = await _authService.signInWithEmailAndPassword(
+        final result = await _authService.signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
               break;
           }
         } else {
-          _showErrorDialog(result.message);
+          _showErrorDialog(result.error ?? 'Login failed');
         }
       } catch (e) {
         setState(() => _isLoading = false);
