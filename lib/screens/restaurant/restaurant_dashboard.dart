@@ -105,6 +105,7 @@ class _RestaurantDashboardState extends State<RestaurantDashboard> with SingleTi
         }
         _isLoading = false;
       });
+    }
   }
 
   _updateOrderStatus(Order order, OrderStatus newStatus) async {
@@ -646,18 +647,18 @@ class _AddEditMealDialogState extends State<AddEditMealDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(labelText: 'Name'),
-                validator: (value) => value!.isEmpty ? 'Name cannot be empty' : null,
+                validator: (value) => value == null || value.isEmpty ? 'Name cannot be empty' : null,
               ),
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(labelText: 'Description'),
                 maxLines: 2,
-                validator: (value) => value!.isEmpty ? 'Description cannot be empty' : null,
+                validator: (value) => value == null || value.isEmpty ? 'Description cannot be empty' : null,
               ),
               TextFormField(
                 controller: _imageUrlController,
                 decoration: InputDecoration(labelText: 'Image URL'),
-                validator: (value) => value!.isEmpty ? 'Image URL cannot be empty' : null,
+                validator: (value) => value == null || value.isEmpty ? 'Image URL cannot be empty' : null,
               ),
               SizedBox(height: 10),
               Row(
@@ -680,7 +681,7 @@ class _AddEditMealDialogState extends State<AddEditMealDialog> {
                   decoration: InputDecoration(labelText: 'Price (FCFA)'),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value!.isEmpty) return 'Price cannot be empty';
+                    if (value == null || value.isEmpty) return 'Price cannot be empty';
                     if (double.tryParse(value) == null) return 'Invalid price';
                     return null;
                   },
