@@ -42,7 +42,8 @@ class _SignupScreenState extends State<SignupScreen> {
             role = UserRole.client;
         }
 
-        final result = await _authService.signUpWithEmailAndPassword(
+        // Use the robust registration method that handles PigeonUserDetails errors
+        final result = await _authService.signUpRobust(
           email: _emailController.text.trim(),
           password: _passwordController.text,
           name: _nameController.text.trim(),
@@ -75,7 +76,14 @@ class _SignupScreenState extends State<SignupScreen> {
         }
       } catch (e) {
         setState(() => _isLoading = false);
-        _showErrorDialog('An unexpected error occurred. Please try again.');
+        print('Signup error: $e');
+        
+        // Show a user-friendly error message
+        if (e.toString().contains('PigeonUserDetails') || e.toString().contains('List<Object?>')) {
+          _showErrorDialog('Registration failed due to a compatibility issue. Please restart the app and try again.');
+        } else {
+          _showErrorDialog('An unexpected error occurred. Please try again.');
+        }
       }
     }
   }
