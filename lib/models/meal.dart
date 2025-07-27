@@ -41,7 +41,7 @@ class Meal {
       price: (map['price'] ?? 0.0).toDouble(),
       imageUrl: map['imageUrl'] ?? '',
       isMeal: map['isMeal'] ?? true,
-      ingredients: List<String>.from(map['ingredients'] ?? []),
+      ingredients: (map['ingredients'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 
